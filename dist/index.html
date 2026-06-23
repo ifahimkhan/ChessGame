@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Three.js Chess</title>
+    <style>
+      body { margin: 0; background: #1a1a2e; overflow: hidden; }
+      #chess-canvas { display: block; width: 100vw; height: 100vh; }
+      #hud {
+        position: absolute;
+        top: 12px;
+        left: 12px;
+        color: #f0d9b5;
+        font-family: system-ui, sans-serif;
+        font-size: 14px;
+        pointer-events: none;
+        user-select: none;
+      }
+    </style>
+    <script type="module" crossorigin src="./assets/index-6WPTclWg.js"></script>
+  </head>
+  <body>
+    <canvas id="chess-canvas"></canvas>
+    <div id="hud"></div>
+  </body>
+</html>
