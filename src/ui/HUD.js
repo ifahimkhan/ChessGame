@@ -7,16 +7,18 @@ const SYMBOLS = {
 }
 
 export class HUD {
-  constructor(gameState, pieces, board) {
+  constructor(gameState, pieces, board, soundManager = null) {
     this.gameState = gameState
     this.pieces = pieces
     this.board = board
+    this.soundManager = soundManager
     this.capturedByWhite = [] // black pieces white took
     this.capturedByBlack = [] // white pieces black took
     this.moveNumber = 1
     this.#cache()
     this._listen()
     this._updateTurnIndicator()
+    if (this.soundManager) this._renderMuteButton()
   }
 
   #cache() {
@@ -51,6 +53,9 @@ export class HUD {
   }
 
   _onMove(detail) {
+    // Sound first (check > capture > move priority handled inside).
+    if (this.soundManager) this.soundManager.playForMove(detail, this.gameState.chess)
+
     // After move, currentTurn() = side now to move = side that was just captured against.
     // Capturer = opposite of currentTurn.
     if (detail.captured) {
@@ -89,6 +94,18 @@ export class HUD {
   _updateTurnIndicator() {
     const turn = this.gameState.currentTurn()
     this.elTurn.textContent = turn === 'w' ? "White's Turn ♙" : "Black's Turn ♟"
+  }
+
+  _renderMuteButton() {
+    const btn = document.createElement('button')
+    btn.id = 'mute-btn'
+    btn.textContent = this.soundManager.isMuted() ? '🔇' : '🔊'
+    btn.title = 'Toggle sound'
+    btn.addEventListener('click', () => {
+      const muted = this.soundManager.toggleMute()
+      btn.textContent = muted ? '🔇' : '🔊'
+    })
+    document.getElementById('hud').appendChild(btn)
   }
 
   _renderCaptured() {

@@ -7,6 +7,7 @@ import { CameraFlip } from './scene/CameraFlip.js'
 import { AI } from './game/AI.js'
 import { HUD } from './ui/HUD.js'
 import { ModeSelector } from './ui/ModeSelector.js'
+import { SoundManager } from './ui/SoundManager.js'
 
 // Render loop can run before a mode is chosen — it just draws an empty board.
 sceneManager.start()
@@ -14,6 +15,12 @@ sceneManager.start()
 async function init() {
   // 1. Wait for the player's first mode/difficulty choice.
   const first = await ModeSelector.show()
+
+  // Preload sounds right after the first user gesture (the mode-selector click
+  // is a valid gesture for starting an AudioContext). Fire-and-forget — if the
+  // files are missing the game still works silently.
+  const soundManager = new SoundManager()
+  soundManager.preload().catch((err) => console.warn('Sound load failed:', err))
 
   // 2. Build the game with the chosen mode.
   const gameState = new GameState(first.mode)
@@ -33,7 +40,7 @@ async function init() {
     gameState,
     cameraFlip
   )
-  const hud = new HUD(gameState, pieces, board)
+  const hud = new HUD(gameState, pieces, board, soundManager)
 
   // Single AI instance. It self-gates on gameState.mode === 'ai', so it stays
   // dormant in PvP and we never have to tear it down when the mode changes.
