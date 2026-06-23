@@ -6,7 +6,7 @@ export class SoundManager {
   constructor() {
     this._muted = localStorage.getItem('chess-muted') === 'true'
     this._ctx = null // AudioContext — created on first user gesture
-    this._buffers = {} // { move, capture, check }
+    this._buffers = {} // { move, capture, check, checkmate }
     this._loaded = false
   }
 
@@ -19,7 +19,8 @@ export class SoundManager {
     const files = {
       move: 'sounds/move.mp3',
       capture: 'sounds/capture.mp3',
-      check: 'sounds/check.mp3'
+      check: 'sounds/check.mp3',
+      checkmate: 'sounds/checkmate.mp3'
     }
 
     await Promise.all(
@@ -51,10 +52,13 @@ export class SoundManager {
     source.start(0)
   }
 
-  // Convenience for the 'move:made' listener. Check takes priority and plays
-  // INSTEAD of move/capture (matches Lichess behaviour).
+  // Convenience for the 'move:made' listener. Priority (each plays INSTEAD of
+  // the next): checkmate > check > capture > move. isCheck() is true on mate
+  // too, so checkmate must be tested first.
   playForMove(detail, chess) {
-    if (chess.isCheck()) {
+    if (chess.isCheckmate()) {
+      this.play('checkmate')
+    } else if (chess.isCheck()) {
       this.play('check')
     } else if (detail.captured) {
       this.play('capture')
