@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js'
 import { COLORS } from '../utils/colors.js'
 import { Animations } from '../ui/Animations.js'
 
@@ -14,11 +15,18 @@ export class SceneManager {
     this.renderer.setSize(window.innerWidth, window.innerHeight)
     this.renderer.shadowMap.enabled = true
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap
+    // Filmic tone mapping flatters the PBR wood materials.
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping
+    this.renderer.toneMappingExposure = 1.1
 
     this.clock = new THREE.Clock()
 
     this.scene = new THREE.Scene()
     this.scene.background = new THREE.Color('#1a1a2e')
+
+    // Soft indoor IBL so the lacquered wood picks up subtle reflections.
+    const pmrem = new THREE.PMREMGenerator(this.renderer)
+    this.scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture
 
     this.camera = new THREE.PerspectiveCamera(
       45,
@@ -34,7 +42,7 @@ export class SceneManager {
   }
 
   initLights() {
-    const ambient = new THREE.AmbientLight(COLORS.ambientLight, 0.6)
+    const ambient = new THREE.AmbientLight(COLORS.ambientLight, 0.3)
     this.scene.add(ambient)
 
     const dir = new THREE.DirectionalLight(COLORS.directionalLight, 1.0)
@@ -62,6 +70,10 @@ export class SceneManager {
     this.controls.update()
   }
 
+  setCameraFlip(cameraFlip) {
+    this._cameraFlip = cameraFlip
+  }
+
   onResize() {
     this.camera.aspect = window.innerWidth / window.innerHeight
     this.camera.updateProjectionMatrix()
@@ -79,7 +91,13 @@ export class SceneManager {
   render() {
     const delta = this.clock.getDelta()
     Animations.update(delta)
-    this.controls.update()
+
+    // While a camera flip runs it drives the camera directly; OrbitControls
+    // must stay out of it (controls.update() would fight the animation).
+    const flipping = this._cameraFlip && this._cameraFlip.isFlipping()
+    if (this._cameraFlip) this._cameraFlip.update(delta)
+    if (!flipping) this.controls.update()
+
     this.renderer.render(this.scene, this.camera)
 
     if (import.meta.env.DEV) {

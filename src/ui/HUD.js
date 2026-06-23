@@ -35,6 +35,14 @@ export class HUD {
     this.gameState.addEventListener('game:over', (e) => this._onGameOver(e.detail))
     this.gameState.addEventListener('game:reset', () => this._onReset())
 
+    // PvP camera flip: show a transient status, then restore the turn text.
+    this.gameState.addEventListener('flip:start', () => {
+      this.elTurn.textContent = '↺ Switching sides...'
+    })
+    this.gameState.addEventListener('flip:complete', () => {
+      this._updateTurnIndicator()
+    })
+
     this.elRestart.addEventListener('click', () => {
       this.gameState.reset()
       this.pieces.syncWithFen(this.gameState.getFen())

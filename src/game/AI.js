@@ -1,9 +1,22 @@
 // Simple chess AI. NO Three.js, NO DOM. Pure chess.js computation.
-// Plays black only. Difficulty: 'easy' (random) | 'medium' (minimax depth 2).
-
+// Plays black only. Difficulty controls search depth (plies):
+//   'easy'   -> random legal move
+//   'medium' -> 2-ply alpha-beta minimax
+//   'hard'   -> 4-ply alpha-beta minimax
 const PIECE_VALUES = { p: 100, n: 320, b: 330, r: 500, q: 900, k: 20000 }
 
-const MAX_DEPTH = 2
+const DIFFICULTY_DEPTH = { easy: 0, medium: 2, hard: 4 }
+
+// Search captures first: better alpha-beta pruning -> deeper search stays fast.
+function orderMoves(moves) {
+  return moves
+    .slice()
+    .sort(
+      (a, b) =>
+        (b.captured ? PIECE_VALUES[b.captured] : 0) -
+        (a.captured ? PIECE_VALUES[a.captured] : 0)
+    )
+}
 
 // Positive = good for white, negative = good for black.
 export function evaluate(chess) {
@@ -24,7 +37,7 @@ export function minimax(chess, depth, alpha, beta, maximizing) {
     return evaluate(chess)
   }
 
-  const moves = chess.moves({ verbose: true })
+  const moves = orderMoves(chess.moves({ verbose: true }))
 
   if (maximizing) {
     let best = -Infinity
@@ -56,16 +69,19 @@ export function getBestMove(chess, difficulty) {
   const moves = chess.moves({ verbose: true })
   if (moves.length === 0) return null
 
-  if (difficulty !== 'medium') {
+  const depth = DIFFICULTY_DEPTH[difficulty] ?? 0
+
+  // Easy (depth 0): pick a random legal move.
+  if (depth <= 0) {
     const m = moves[Math.floor(Math.random() * moves.length)]
     return { from: m.from, to: m.to }
   }
 
   let bestMove = null
   let bestScore = Infinity
-  for (const m of moves) {
+  for (const m of orderMoves(moves)) {
     chess.move(m)
-    const score = minimax(chess, MAX_DEPTH - 1, -Infinity, Infinity, true)
+    const score = minimax(chess, depth - 1, -Infinity, Infinity, true)
     chess.undo()
     if (score < bestScore) {
       bestScore = score
@@ -75,28 +91,49 @@ export function getBestMove(chess, difficulty) {
   return bestMove ? { from: bestMove.from, to: bestMove.to } : null
 }
 
+// Drives black's moves. The actual search runs in a Web Worker so deep
+// (hard) searches never block the render loop / UI thread.
 export class AI {
   constructor(gameState, difficulty = 'easy') {
     this.gameState = gameState
     this.difficulty = difficulty
+    this.thinking = false
+
+    this.worker = new Worker(new URL('./aiWorker.js', import.meta.url), {
+      type: 'module'
+    })
+    this.worker.onmessage = (e) => this._onResult(e.data)
+
     this._listen()
   }
 
   _listen() {
-    this.gameState.addEventListener('move:made', () => {
-      if (this.gameState.mode !== 'ai') return
-      if (this.gameState.currentTurn() !== 'b') return
-      if (this.gameState.status !== 'playing') return
-      // Non-blocking: yield to render frame first.
-      setTimeout(() => this._doMove(), 0)
+    this.gameState.addEventListener('move:made', () => this._maybeMove())
+    // A reset can land mid-think; drop any in-flight result.
+    this.gameState.addEventListener('game:reset', () => {
+      this.thinking = false
     })
   }
 
-  _doMove() {
+  _maybeMove() {
+    if (this.gameState.mode !== 'ai') return
     if (this.gameState.currentTurn() !== 'b') return
     if (this.gameState.status !== 'playing') return
-    const chess = this.gameState.chess
-    const move = getBestMove(chess, this.difficulty)
+    if (this.thinking) return
+
+    this.thinking = true
+    this.worker.postMessage({
+      fen: this.gameState.getFen(),
+      difficulty: this.difficulty
+    })
+  }
+
+  _onResult(move) {
+    this.thinking = false
+    // Guard: board may have changed (reset / wrong turn) while thinking.
+    if (this.gameState.mode !== 'ai') return
+    if (this.gameState.currentTurn() !== 'b') return
+    if (this.gameState.status !== 'playing') return
     if (move) this.gameState.makeMove(move.from, move.to)
   }
 }

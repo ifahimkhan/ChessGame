@@ -1,18 +1,18 @@
 import * as THREE from 'three'
 import { Animations } from '../ui/Animations.js'
-import { sceneManager } from '../scene/SceneManager.js'
 
 const PROMO_PIECES = ['q', 'r', 'b', 'n']
 
 // Glue layer: mouse click -> raycast -> chess square -> GameState.
 // Owns NO game logic. Listens to GameState events, drives Board + Pieces.
 export class MoveHandler {
-  constructor(renderer, camera, board, pieces, gameState) {
+  constructor(renderer, camera, board, pieces, gameState, cameraFlip = null) {
     this.renderer = renderer
     this.camera = camera
     this.board = board
     this.pieces = pieces
     this.gameState = gameState
+    this.cameraFlip = cameraFlip
 
     this.raycaster = new THREE.Raycaster()
     this.mouse = new THREE.Vector2()
@@ -134,8 +134,7 @@ export class MoveHandler {
       Animations.playMove(movingGroup, from, to, () =>
         this.pieces.syncWithFen(e.detail.fen)
       )
-
-      this._maybeFlipCamera()
+      // PvP camera flip is driven by CameraFlip (listens to move:made too).
     })
 
     gs.addEventListener('move:illegal', (e) => {
@@ -147,14 +146,21 @@ export class MoveHandler {
     gs.addEventListener('game:over', () => {
       this.disabled = true
     })
-  }
 
-  // PvP only: swing camera to the side of the player now to move.
-  _maybeFlipCamera() {
-    if (this.gameState.mode !== 'pvp') return
-    const turn = this.gameState.currentTurn()
-    sceneManager.camera.position.set(0, 8, turn === 'w' ? 8 : -8)
-    sceneManager.controls.target.set(0, 0, 0)
-    sceneManager.controls.update()
+    // Play Again resets the game -> clear board state and re-enable input.
+    gs.addEventListener('game:reset', () => {
+      this.disabled = false
+      this.hoveredSquare = null
+      this.board.clearAllHighlights()
+    })
+
+    // Lock input while the PvP camera flip animates.
+    gs.addEventListener('flip:start', () => {
+      this.disabled = true
+    })
+    gs.addEventListener('flip:complete', () => {
+      // Keep input locked if the game ended on the move that triggered the flip.
+      this.disabled = this.gameState.status !== 'playing'
+    })
   }
 }
