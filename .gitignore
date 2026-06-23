@@ -1,0 +1,17 @@
+# Dependencies
+node_modules/
+
+# Build output (GitHub Actions rebuilds this; no need to commit it)
+dist/
+
+# Local tooling / editor
+.claude/
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Logs / env
+*.log
+.env
+.env.local
