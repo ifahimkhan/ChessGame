@@ -33,9 +33,9 @@ function playCapture(pieceGroup, onComplete) {
     if (onComplete) onComplete()
     return
   }
-  // Enable transparency so opacity fade is visible.
+  // Enable transparency so opacity fade is visible (meshes and emoji sprites).
   pieceGroup.traverse((child) => {
-    if (child.isMesh) child.material.transparent = true
+    if (child.isMesh || child.isSprite) child.material.transparent = true
   })
   activeAnimations.push({
     type: 'capture',
@@ -60,7 +60,7 @@ function applyCapture(anim, t) {
   const s = 1 - t
   anim.group.scale.set(s, s, s)
   anim.group.traverse((child) => {
-    if (child.isMesh) child.material.opacity = s
+    if (child.isMesh || child.isSprite) child.material.opacity = s
   })
 }
 

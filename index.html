@@ -87,10 +87,104 @@
         background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
         color: #fff; font-size: 0.9rem;
       }
+
+      /* ---- 2D board view ---- */
+      #board-2d {
+        position: fixed; inset: 0; z-index: 5;
+        display: flex; align-items: center; justify-content: center;
+        background: var(--page-bg, #fff0f6);
+        transition: background 0.3s;
+      }
+      .board2d-grid {
+        display: grid;
+        grid-template-columns: repeat(8, 1fr);
+        grid-template-rows: repeat(8, 1fr);
+        width: min(92vmin, 720px);
+        height: min(92vmin, 720px);
+        border-radius: 16px;
+        overflow: hidden;
+        box-shadow: 0 12px 40px rgba(0,0,0,0.25);
+        border: 6px solid rgba(255,255,255,0.7);
+      }
+      .board2d-cell {
+        position: relative; border: none; padding: 0; margin: 0;
+        display: flex; align-items: center; justify-content: center;
+        cursor: pointer; font-size: 3.2vmin; line-height: 1;
+        transition: background 0.12s;
+      }
+      @media (min-width: 800px) { .board2d-cell { font-size: 38px; } }
+      .board2d-piece {
+        display: flex; align-items: center; justify-content: center;
+        width: 78%; height: 78%; border-radius: 50%;
+        filter: drop-shadow(0 2px 2px rgba(0,0,0,0.25));
+      }
+      .board2d-piece.side-w { background: rgba(255,255,255,0.92); box-shadow: inset 0 0 0 2px rgba(0,0,0,0.12); }
+      .board2d-piece.side-b { background: rgba(40,40,55,0.88); box-shadow: inset 0 0 0 2px rgba(255,255,255,0.25); }
+      .board2d-piece.side-b { text-shadow: 0 0 1px rgba(255,255,255,0.5); }
+      .board2d-piece.classic {
+        background: none; box-shadow: none; width: auto; height: auto;
+        font-size: 1em; /* per-piece size set inline */
+        text-shadow:
+          1px 0 0 #2c1c0c, -1px 0 0 #2c1c0c, 0 1px 0 #2c1c0c, 0 -1px 0 #2c1c0c,
+          0 2px 2px rgba(0,0,0,0.3);
+      }
+      .board2d-dot {
+        position: absolute; width: 26%; height: 26%; border-radius: 50%;
+        background: var(--legal, #ff5ca8); opacity: 0.7; pointer-events: none;
+      }
+      .board2d-capture {
+        position: absolute; inset: 8%; border-radius: 50%;
+        border: 5px solid var(--legal, #ff5ca8); opacity: 0.8; pointer-events: none;
+      }
+
+      /* ---- Settings panel ---- */
+      #settings-btn {
+        position: fixed; top: 16px; right: 16px; z-index: 200;
+        width: 46px; height: 46px; border-radius: 50%;
+        background: rgba(255,255,255,0.9); border: none; cursor: pointer;
+        font-size: 1.5rem; box-shadow: 0 4px 14px rgba(0,0,0,0.2);
+        transition: transform 0.2s;
+      }
+      #settings-btn:hover { transform: rotate(45deg) scale(1.08); }
+      #settings-panel {
+        position: fixed; top: 70px; right: 16px; z-index: 200;
+        background: #fff; color: #333; border-radius: 16px;
+        padding: 16px 18px; width: 230px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+        font-family: 'Segoe UI', system-ui, sans-serif;
+      }
+      #settings-panel h3 { margin: 0 0 12px; font-size: 1.1rem; }
+      #settings-panel label { display: block; font-size: 0.8rem; font-weight: 600; margin: 12px 0 4px; color: #666; }
+      #settings-panel select {
+        width: 100%; padding: 8px 10px; border-radius: 10px;
+        border: 2px solid #eee; font-size: 1rem; cursor: pointer; background: #fafafa;
+      }
+      .seg { display: flex; gap: 6px; }
+      .seg button {
+        flex: 1; padding: 8px; border-radius: 10px; border: 2px solid #eee;
+        background: #fafafa; cursor: pointer; font-size: 0.95rem; font-weight: 600;
+      }
+      .seg button.active { background: #4a90d9; color: #fff; border-color: #4a90d9; }
     </style>
   </head>
   <body>
     <canvas id="chess-canvas"></canvas>
+    <div id="board-2d" class="hidden"></div>
+
+    <button id="settings-btn" class="hidden" title="Settings" aria-label="Settings">⚙️</button>
+    <div id="settings-panel" class="hidden">
+      <h3>🎨 Look &amp; Feel</h3>
+      <label>Board view</label>
+      <div class="seg" id="view-seg">
+        <button data-view="2d">🟦 2D</button>
+        <button data-view="3d">🧊 3D</button>
+      </div>
+      <label for="theme-select">Color theme</label>
+      <select id="theme-select"></select>
+      <label for="piece-select">Chess pieces</label>
+      <select id="piece-select"></select>
+    </div>
+
     <div id="mode-selector">
       <div class="mode-card">
         <h1>♟ Chess</h1>
