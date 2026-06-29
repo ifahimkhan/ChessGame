@@ -74,6 +74,11 @@ export class SceneManager {
     this._cameraFlip = cameraFlip
   }
 
+  // Tint the 3D backdrop to match the active color theme.
+  setBackground(color) {
+    this.scene.background = new THREE.Color(color)
+  }
+
   onResize() {
     this.camera.aspect = window.innerWidth / window.innerHeight
     this.camera.updateProjectionMatrix()

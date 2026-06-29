@@ -8,6 +8,9 @@ import { AI } from './game/AI.js'
 import { HUD } from './ui/HUD.js'
 import { ModeSelector } from './ui/ModeSelector.js'
 import { SoundManager } from './ui/SoundManager.js'
+import { SettingsPanel } from './ui/SettingsPanel.js'
+import { Board2D } from './scene2d/Board2D.js'
+import { settings, THEMES } from './utils/themes.js'
 
 // Render loop can run before a mode is chosen — it just draws an empty board.
 sceneManager.start()
@@ -41,6 +44,34 @@ async function init() {
     cameraFlip
   )
   const hud = new HUD(gameState, pieces, board, soundManager)
+
+  // 2D view shares the same GameState (pure logic). Both views stay in sync;
+  // only the visible one accepts clicks. Kids switch live from the gear menu.
+  const board2d = new Board2D(gameState, document.getElementById('board-2d'))
+
+  const applyView = (view) => {
+    const is2d = view === '2d'
+    document.getElementById('chess-canvas').classList.toggle('hidden', is2d)
+    board2d.setActive(is2d)
+    // Disable 3D click handling while the 2D board is showing, and vice versa.
+    moveHandler.disabled = is2d || gameState.status !== 'playing'
+  }
+  // Keep the 3D board/background and 3D pieces in sync with the same theme &
+  // piece-style settings the 2D board uses, so both views always match.
+  const applyTheme3D = () => {
+    const t = THEMES[settings.get('theme')] || THEMES.candy
+    board.applyTheme(t)
+    sceneManager.setBackground(t.page)
+  }
+  settings.addEventListener('change', (e) => {
+    if (e.detail.key === 'theme') applyTheme3D()
+    if (e.detail.key === 'pieceStyle') pieces.rebuild(gameState.getFen())
+  })
+  applyTheme3D()
+
+  new SettingsPanel(applyView)
+  document.getElementById('settings-btn').classList.remove('hidden')
+  applyView(settings.get('view'))
 
   // Single AI instance. It self-gates on gameState.mode === 'ai', so it stays
   // dormant in PvP and we never have to tear it down when the mode changes.

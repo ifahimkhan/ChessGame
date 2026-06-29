@@ -1,26 +1,30 @@
 import * as THREE from 'three'
-import { COLORS } from '../utils/colors.js'
+import { THEMES, settings } from '../utils/themes.js'
 import { squareToWorld } from '../utils/coords.js'
 
 const FILES = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
 
-// Maps highlight type -> palette color. 'lastMove' reuses the highlight tint.
-const HIGHLIGHT_COLOR = {
-  selected: COLORS.selected,
-  legalMove: COLORS.legalMove,
-  lastMove: COLORS.highlight
-}
-const HIGHLIGHT_TYPES = Object.keys(HIGHLIGHT_COLOR)
+const HIGHLIGHT_TYPES = ['selected', 'legalMove', 'lastMove']
 
 // Renders the 3D board: 64 squares + border. Owns highlight overlays.
-// Does NOT render pieces or handle input.
+// Square colors + highlight tints follow the active color theme so the 3D
+// board matches the 2D board (Forest, Candy, Ocean…). Does NOT render pieces.
 export class Board {
   constructor(scene) {
     this.scene = scene
     this.squareMeshes = {}
     this.highlights = {} // square -> overlay Mesh (mesh.userData.type set)
+    this.theme = THEMES[settings.get('theme')] || THEMES.candy
     this.buildSquares()
     this.buildBorder()
+  }
+
+  // Map a highlight type to a theme color.
+  #highlightColor(type) {
+    if (type === 'selected') return this.theme.selected
+    if (type === 'legalMove') return this.theme.legal
+    if (type === 'lastMove') return this.theme.lastMove
+    return null
   }
 
   buildSquares() {
@@ -31,7 +35,7 @@ export class Board {
         // a1 is dark in standard chess: dark when (col+row) even.
         const isLight = (col + row) % 2 === 1
         const mat = new THREE.MeshLambertMaterial({
-          color: isLight ? COLORS.boardLight : COLORS.boardDark
+          color: isLight ? this.theme.light : this.theme.dark
         })
         const mesh = new THREE.Mesh(geo, mat)
         mesh.rotation.x = -Math.PI / 2
@@ -39,9 +43,19 @@ export class Board {
         mesh.position.set(x, 0, z)
         mesh.receiveShadow = true
         mesh.name = sq
+        mesh.userData.isLight = isLight
         this.scene.add(mesh)
         this.squareMeshes[sq] = mesh
       }
+    }
+  }
+
+  // Recolor every square to a new theme (live theme switching).
+  applyTheme(theme) {
+    this.theme = theme
+    for (const sq of Object.keys(this.squareMeshes)) {
+      const mesh = this.squareMeshes[sq]
+      mesh.material.color.set(mesh.userData.isLight ? theme.light : theme.dark)
     }
   }
 
@@ -57,7 +71,7 @@ export class Board {
   }
 
   highlight(square, type) {
-    const color = HIGHLIGHT_COLOR[type]
+    const color = this.#highlightColor(type)
     if (!color) throw new Error(`Unknown highlight type: ${type}`)
     // Remove any existing overlay on this square first.
     this.#removeHighlight(square)

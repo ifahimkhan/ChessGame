@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import { Chess } from 'chess.js'
 import { squareToWorld } from '../utils/coords.js'
+import { PIECE_STYLES, PIECE_SIZE, settings } from '../utils/themes.js'
 
 // Renders 3D pieces. Listens to game state (FEN) — no input, no animation.
 // Each piece is a THREE.Group; userData = { square, color, type }.
@@ -203,9 +204,65 @@ const FACTORY = {
   k: createKing
 }
 
+// --- Themed emoji "standee" pieces -----------------------------------------
+// For the Flowers / Animals / Fruit styles we stand the matching emoji upright
+// on a turned pedestal, so the 3D board shows the same pieces as the 2D board.
+// One CanvasTexture per glyph is cached and shared across pieces.
+
+const emojiCache = {} // glyph -> THREE.CanvasTexture
+
+function emojiTexture(glyph) {
+  if (emojiCache[glyph]) return emojiCache[glyph]
+  const size = 256
+  const c = document.createElement('canvas')
+  c.width = c.height = size
+  const ctx = c.getContext('2d')
+  ctx.font = `${Math.floor(size * 0.78)}px "Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif`
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.fillText(glyph, size / 2, size * 0.54)
+  const tex = new THREE.CanvasTexture(c)
+  tex.colorSpace = THREE.SRGBColorSpace
+  emojiCache[glyph] = tex
+  return tex
+}
+
+function pedestalMaterial(color) {
+  // Light pedestal for white, dark for black — keeps sides readable on any board.
+  return new THREE.MeshStandardMaterial({
+    color: color === 'w' ? '#f4efe6' : '#3b3b46',
+    roughness: 0.5,
+    metalness: 0.05
+  })
+}
+
+function createStandee(type, color, style) {
+  const g = new THREE.Group()
+  const ped = pedestalMaterial(color)
+  // Small turned base so the emoji has something 3D to stand on.
+  const base = [
+    [0, 0], [0.3, 0], [0.3, 0.05], [0.24, 0.1], [0.1, 0.13],
+    [0.1, 0.17], [0.16, 0.19], [0, 0.19]
+  ]
+  g.add(lathe(base, ped))
+
+  const glyph = PIECE_STYLES[style].glyphs[type]
+  const sprite = new THREE.Sprite(
+    new THREE.SpriteMaterial({ map: emojiTexture(glyph), transparent: true })
+  )
+  const s = 0.55 + (PIECE_SIZE[type] || 1) * 0.55 // bigger glyph for bigger pieces
+  sprite.scale.set(s, s, 1)
+  sprite.position.set(0, 0.19 + s / 2, 0)
+  g.add(sprite)
+  return g
+}
+
 function createPiece(type, color) {
-  const mat = materialFor(color)
-  const group = FACTORY[type](mat)
+  const style = settings.get('pieceStyle')
+  const group =
+    !style || style === 'classic'
+      ? FACTORY[type](materialFor(color))
+      : createStandee(type, color, style)
   group.userData = { color, type }
   return group
 }
@@ -274,6 +331,15 @@ export class Pieces {
     }
   }
 
+  // Hard reset to the current piece style: dispose every group and recreate
+  // from FEN. Used when the player switches style (Flowers/Fruit/Classic…),
+  // since syncWithFen would otherwise reuse the old-style groups.
+  rebuild(fen) {
+    for (const sq of Object.keys(this.meshes)) this.#dispose(this.meshes[sq])
+    this.meshes = {}
+    this.syncWithFen(fen)
+  }
+
   #place(square, type, color) {
     const group = createPiece(type, color)
     const { x, z } = squareToWorld(square)
@@ -306,9 +372,13 @@ export class Pieces {
   #dispose(group) {
     this.scene.remove(group)
     group.traverse((child) => {
-      if (!child.isMesh) return
-      child.geometry.dispose()
-      child.material.dispose()
+      if (child.isMesh) {
+        child.geometry.dispose()
+        child.material.dispose()
+      } else if (child.isSprite) {
+        // Don't dispose the shared emoji texture (cached); just the material.
+        child.material.dispose()
+      }
     })
   }
 
